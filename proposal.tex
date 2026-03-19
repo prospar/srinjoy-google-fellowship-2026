@@ -11,6 +11,7 @@
 \usepackage{wrapfig}
 \usepackage{subcaption}
 \usepackage[multiple]{footmisc}
+\usepackage{lmodern}
 
 \usepackage[numbers]{natbib}
 \setlength{\bibsep}{0pt plus 0.3ex}
@@ -18,7 +19,7 @@
 \usepackage{fancyhdr}  % use this package to get a 2 line header
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\it TCS RSP 2026\/}
+\fancyhead[L]{\it Google India PhD Fellowship 2026\/}
 \fancyhead[R]{{\bf Srinjoy Sarkar}}
 \fancyfoot{}
 \fancyfoot[R]{\thepage}
@@ -493,6 +494,34 @@ proposed design. In each configuration, we will evaluate two underlying data
 structures, a hash table and a skip list, to enable a comprehensive comparison
 of their performance characteristics. We are confident that such a case study will comprehensively showcase the performance and scalability benefits of our proposed data structure designs.
 
+\section*{Results so far}
+
+We have designed a two level hierarchical structure for both hash table and skiplist.
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.3\columnwidth}
+    \centering
+    \includegraphics[width=\linewidth]{"./figs/comparison_speedup_insert_cuco.pdf"}
+    \caption{{Speedup of \htovs relative to cuco static map for the \code{insert()}.}}
+    \label{fig:ht-uvm-cuco-comparison-insert}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.3\columnwidth}
+    \centering
+    \includegraphics[width=\linewidth]{"./figs/comparison_speedup_search_cuco.pdf"}
+    \caption{{Speedup of \htovs relative to cuco static map for the \code{search()}.}}
+    \label{fig:ht-uvm-cuco-comparison-search}
+  \end{subfigure}
+  \begin{subfigure}[b]{0.3\columnwidth}
+    \centering
+    \includegraphics[width=\linewidth]{"./figs/comparison_speedup_insert_gph.pdf"}
+    \caption{{Speedup of \htovs relative to GPH for the \code{insert()}.}}
+    \label{fig:ht-uvm-GPH-comparison}
+  \end{subfigure}
+  \caption{Scaling of \htuvm and \skipuvm with oversubscription}
+  \label{fig:results hashtable}
+\end{figure}
+The hash table structure achieves a speedup of 41x for 100\% oversubscription scenario for \code{insert()} kernel and upto 10.4x for \code{search()} kernel(as shown in figure~\ref{fig:ht-uvm-cuco-comparison-insert} and~\ref{fig:ht-uvm-cuco-comparison-search}), over NVIDIA proposed cuCollections~\cite{cucollections-nvidia} when extended to support oversubscription. Our hash table also achieves a speed up of upto 40.8x over GPH~\cite{gph-pamd-2025} for \code{insert()} kernel as shown in figure~\ref{fig:ht-uvm-GPH-comparison}.
+
 \section*{Ongoing Work}
 
 \paragraph*{Evaluate memory hints} We are empirically evaluating the optimal set
@@ -525,7 +554,7 @@ irregular access scenarios for improved scaling.
 
 {\scriptsize
 \bibliographystyle{plain}
-\bibliography{./../references/venue-full,./../references/references}
+\bibliography{./../references/venue-full.bib,./../references/references.bib,./../references/venue-abbrv.bib}
 }
 
 \end{document}
