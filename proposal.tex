@@ -499,19 +499,19 @@ of their performance characteristics. We are confident that such a case study wi
 We have designed a two level hierarchical structure for both hash table and skiplist.
 \begin{figure}[t]
   \centering
-  \begin{subfigure}[b]{0.3\columnwidth}
+  \begin{subfigure}[b]{0.28\columnwidth}
     \centering
     \includegraphics[width=\linewidth]{"./figs/comparison_speedup_insert_cuco.pdf"}
     \caption{{Speedup of \htovs relative to cuco static map for the \code{insert()}.}}
     \label{fig:ht-uvm-cuco-comparison-insert}
   \end{subfigure}
-  \begin{subfigure}[b]{0.3\columnwidth}
+  \begin{subfigure}[b]{0.28\columnwidth}
     \centering
     \includegraphics[width=\linewidth]{"./figs/comparison_speedup_search_cuco.pdf"}
     \caption{{Speedup of \htovs relative to cuco static map for the \code{search()}.}}
     \label{fig:ht-uvm-cuco-comparison-search}
   \end{subfigure}
-  \begin{subfigure}[b]{0.3\columnwidth}
+  \begin{subfigure}[b]{0.28\columnwidth}
     \centering
     \includegraphics[width=\linewidth]{"./figs/comparison_speedup_insert_gph.pdf"}
     \caption{{Speedup of \htovs relative to GPH for the \code{insert()}.}}
@@ -522,33 +522,26 @@ We have designed a two level hierarchical structure for both hash table and skip
 \end{figure}
 The hash table structure achieves a speedup of 41x for 100\% oversubscription scenario for \code{insert()} kernel and upto 10.4x for \code{search()} kernel(as shown in figure~\ref{fig:ht-uvm-cuco-comparison-insert} and~\ref{fig:ht-uvm-cuco-comparison-search}), over NVIDIA proposed cuCollections~\cite{cucollections-nvidia} when extended to support oversubscription. Our hash table also achieves a speed up of upto 40.8x over GPH~\cite{gph-pamd-2025} for \code{insert()} kernel as shown in figure~\ref{fig:ht-uvm-GPH-comparison}.
 
+Our \skipovs also outperforms the UVM version GFSl~\cite{gfsl-pact-2017} upto 1.59x for \code{insert()} and 1.64x for \code{search()} with sorting enabled for both.
+
+We also incoroporated our designs of \htovs and \skipovs in \textbf{metagenomics classifier}\cite{metacache-icpp-2021} and \textbf{k-mer counting}\cite{cuclark}.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[scale=0.27]{"./figs/comparison_applications.pdf"}
+  \caption{Speedup achieved by \htovs and \skipovs over \htuvm and \skipuvm respectively.}
+  \label{fig:application}
+  \vspace*{-2mm}
+\end{figure}
+As shown in figure~\ref{fig:application}, for hash table, \htovs enjoys a speedup of up to $2.1\times$ for metagenomics database build, $4.8\times$ for k-mer counting and $6\times$ for metagenomics classification phase.
+Even for 50\% GPU memory oversubscription, \htovs offers speedup in the range of $1.4\times$ to $6\times$ over \htuvm.
+\Skipovs achieves a geomean speedup of $2.4\times$ over \skipuvm for the build phase of the metagenomics classifier and the achieved speedup increases with growing oversubscription degree. The geomean speedup achieved by \skipovs for the metagenomics classification phase is $1.81\times$ over \skipuvm. The k-mer counting application enjoys a geomean speedup of $6.3\times$ with \Skipovs over \Skipuvm.
+
 \section*{Ongoing Work}
 
-\paragraph*{Evaluate memory hints} We are empirically evaluating the optimal set
-of memory advise and prefetch hints that are applicable for each data structure.
-This is a challenging problem in itself because of the large search space, \ie,
-product of the number of managed buffers, four possible hints, and different
-degrees of oversubscription. We posit that the optimal set of hints are
-\emph{sensitive} to the buffer allocated with managed memory, access pattern and
-sequence length of the input, and the degree of oversubscription, and is not
-uniform for a given application. An exhaustive evaluation is impractical, and
-static or compile-time solutions (\eg, SUV~\cite{suv-micro-2024}) may generate
-suboptimal results. This adds an extra layer of complexity for the programmer
-and static program analyses~\cite{suv-micro-2024}.
 
-\paragraph*{Other data structures}
-We will extend our exploration to skip lists and AMQ filters. We have completed the literature review for skip lists and working on implementing the baseline GFSL algorithm~\cite{gfsl-pact-2017}. We are still performing a thorough literature review for AMQs. Two-Choice Filter (TCF) is the state-of-the-art filter algorithm for GPUs but does not support counting and hence deletion operations~\cite{gpu-filters-ppopp23}. GPU Quotient Filter (GQF) is the state-of-the-art version for filters that support counting, but has poorer throughput compared to TCF~\cite{gpu-filters-ppopp23}. Our goal is to explore a counting filter that bridges the performance gap between TCF and GQF. Furthermore, our initial experiments with publicly-available TCF and GQF artifacts\footnote{\url{https://github.com/huntermBerkeley/poggers}}\textsuperscript{,}\footnote{\url{https://github.com/huntermBerkeley/gqf-artifacts/tree/v1.2}} show two orders of magnitude drop in the throughput under oversubscription.
-
-\paragraph*{Comparison with related work}
-
-We have completed a first-cut implementation of hash tables that performs well even with memory oversubscription. We will compare our design with existing state-of-the-art approaches for in-memory hash table~\cite{warpcore-hipc-2020,gph-pamd-2025} and also with \NVIDIA's cuCollections library.\footnote{\url{https://github.com/NVIDIA/cuCollections}}
-Both WarpCore and cuCollections need to be extended to support memory oversubscription. We will similarly compare our skip list and AMQ solutions to closely-related prior work.
-
-\bigskip
-\noindent In summary, our proposal aims to bridge the gap between available
-tools for optimizing data management and GPU application performance under
-oversubscription, enabling more efficient handling of oversubscription and
-irregular access scenarios for improved scaling.
+\paragraph*{Current Status}
+Our work \textit{Designing GPU Data Structures for Efficient Memory Oversubscription} has been accepted to appear on OOPSLA 2026.
 
 \clearpage
 
