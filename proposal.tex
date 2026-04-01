@@ -93,28 +93,28 @@ productivity.
 % prefetching a chunk of nearby
 % pages~\cite{cppe-ipdps-2020,uvmsmart-isca-2019,uvm-forest-isca25,hpe-tcad-2020}.
 
-Writing correct but scalable multithreaded GPU kernels is a difficult art~\cite{massively-parallel-processors-v4,kernelbench-arxiv}. In addition to the algorithm and the compute capabilities of the GPU device, the scalability of the application depends on the building blocks of the kernel, \eg, GPU data structures. For example, the performance of the Pinterest application improved substantially by switching to GPU-accelerated hash tables~\cite{pinterest-perf-boost}. Therefore, the design of sophisticated GPU data structures such as lists and trees is an active area of research~\cite{gpu-gems2}. Much recent work has focused on designing efficient data structures (\eg, hash tables, skip lists, B-trees, and membership query filters) for use in device code~\cite{slabhash-ipdps-2020,dachash-sbacpad-2021,warpcore-hipc-2020,warpdrive,parallel-hashmap-nvidia,survey-hashing-tpds-2020,bght,dycuckoo,gph-pamd-2025,gfsl-pact-2017,cmedia-skiplist-ipdpsw-2019,skiplist-survey-2025,multiversion-btree,gpu-filters-ppopp23,harmonia-gpu,gpu-btree,gpu-gelhash,survey-hashing-tpds-2020,lockfree-ds-icpads-2012,quotient-filter,stdgpu,cucollections-nvidia,gpu-cds}.
+Writing correct but scalable multithreaded GPU kernels is a difficult art~\cite{massively-parallel-processors-v4,kernelbench-arxiv}. In addition to the algorithm and the compute capabilities of the GPU device, the scalability of the application depends on the building blocks of the kernel, \eg, GPU data structures. For example, the performance of the Pinterest application improved substantially by switching to GPU-accelerated hash tables~\cite{pinterest-perf-boost}. Therefore, the design of sophisticated GPU data structures such as lists and trees is an active area of research~\cite{gpu-gems2}. Much recent work has focused on designing efficient data structures (\eg, hash tables, skip lists, B-trees, and membership query filters) for use in device code~\cite{slabhash-ipdps-2020,dachash-sbacpad-2021,warpcore-hipc-2020,warpdrive,parallel-hashmap-nvidia,survey-hashing-tpds-2020,bght,dycuckoo,gph-pamd-2025,gfsl-pact-2017,cmedia-skiplist-ipdpsw-2019,skiplist-survey-2025,multiversion-gpu-btree,gpu-filters-ppopp23,harmonia-gpu,gpu-btree,gpu-gelhash,survey-hashing-tpds-2020,lockfree-ds-icpads-2012,quotient-filter,stdgpu,cucollections-nvidia,gpu-cds}.
 
 \paragraph*{The Problem}
 
 The steady increase in the working set size and irregular access patterns of GPU applications require more efficient memory management so that the GPU data structures efficiently scale with the input size. However, existing studies primarily focus on the traditional CTE model (\ie, in-memory data structures) and do not address how to design efficient data structures that oversubscribe memory, and developers fall back to UVM. While UVM simplifies programming, its performance remains a significant concern due to frequent far faults\footnote{Far faults, which occur when a requested page is absent in GPU global memory, require multiple PCIe roundtrips, and are resolved after interacting with the CPU page tables. On \NVIDIA GPUs, a far fault from a CUDA thread stalls the progress of the warp, possibly affecting the overall GPU throughput.},
 high address translation overheads, and high volume of page replacement~\cite{suv-micro-2024,in-depth-analysis-uvm-sc21,fine-grain-quantitative-uvm-taco24,batch-aware-asplos-2020,uvmsmart-isca-2019,cppe-ipdps-2020,irregular-page-walks-isca-2018,heterogeneous-uvm,uvm-forest-isca25,dynamap,uvmbench-arxiv}. For instance, Lin et al.~\cite{oversubscription-dl-training} find UVM-based implementations competitive with the CTE model for workloads that fit in GPU memory, but about $7\times$ slower with oversubscription. The performance degradation with UVM is \emph{more} prominent in applications with irregular access patterns and pointer chasing~\cite{fine-grain-quantitative-uvm-taco24,demystifying-uvm-cost-ipdps2021,in-depth-analysis-uvm-sc21}.
 
-Data structures like hash tables, skip lists, and AMQs are characterized by input-dependent access locality~\cite{art-of-multiprocessor-programming-v2}.
+Data structures like hash tables, skip lists, B-trees, and approximate membership query (AMQ) filters are characterized by input-dependent access locality~\cite{art-of-multiprocessor-programming-v2}.
 % As a result,
 Lack of locality in the input operation strings and suboptimal implementation
 choices can lead to irregular access patterns and poor data locality. When
 memory oversubscription is coupled with these performance pathologies, these
-data structures can exhibit very poor scalability. In this proposal, we aim to
+data structures can exhibit very poor scalability. In this proposal, we
 establish that UVM-based implementations of popular random-access data
 structures with GPU memory oversubscription do not scale well with input size
 even when these implementations are meticulously optimized using data usage
 hints and prefetches based on memory/translation
-usage~\cite{nvidia-prefetching}. Our initial set of experiments show that the
-run times of these implementations increase exponentially with a linear increase
-in the input sizes indicating a clear \emph{performance bottleneck}. We focus on
-alleviating this performance pathology by proposing efficient designs of
-concurrent data structures for GPUs.
+usage~\cite{nvidia-prefetching}. Our experiments show that the run times of
+these implementations increase exponentially with a linear increase in the input
+sizes indicating a clear \emph{performance bottleneck}. We focus on alleviating
+this performance pathology by proposing efficient designs of popular concurrent data
+structures for GPUs (\eg, hash table, skip list, AMQ filter, and B-trees).
 
 \section*{Brief Literature Review}
 
@@ -133,8 +133,6 @@ memory~\cite{listdb-osdi-2022,phast-tpds-2022}, concurrency
 control~\cite{kiwi-ppopp-2017,nitro-vldbe-2016,jellyfish-middleware-2020}, and
 for representing skewed data access
 patterns~\cite{biased-skiplist-algorithm-2001,biased-skiplist-algorithmica-2005}.
-Approximate membership query (AMQ) filters are data structures that maintain a space-optimized approximate representation of a set or a multiset~\cite{gpu-filters-ppopp23}.
-AMQ filters are popularly used in databases, networks, and file systems, where there is a substantial benefit by quickly filtering negative queries. AMQs though allow queries to occasionally return a false positive.
 In this section, we briefly review existing approaches for designing hash tables and skip lists for GPUs without memory oversubscription. We are not aware of existing work that focuses on improving performance for UVM-enabled GPU data structures.
 
 \paragraph*{Hash Table}
@@ -262,14 +260,14 @@ traditional skip list, a key in GFSL is raised to the higher level only on a
 node split operation. Like hash tables, the super-node is sized to match the
 size of a warp (\ie, $N + 2$ is 32).
 
-\begin{figure}[ht]
+\begin{figure}[t]
     \centering
     \includegraphics[width=0.9\columnwidth]{"./figs/gfsl-node-overview1.drawio.pdf"}
     \caption{Super-nodes in index and data layers in GFSL}
     \label{fig:gfsl-node}
 \end{figure}
 
-\begin{figure}[ht]
+\begin{figure}[b]
     \centering
     \includegraphics[width=0.7\columnwidth]{"./figs/gfsl-design-overview-sb.drawio.pdf"}
     \caption{GFSL with two keys per super-node
@@ -279,6 +277,10 @@ size of a warp (\ie, $N + 2$ is 32).
 \end{figure}
 
 \section*{Motivation}
+
+We discuss UVM-based implementations of hash table and skip list that we use as
+the baseline for this work as a first step toward enabling memory
+oversubscription.
 
 \paragraph*{Hash Table with UVM Support}
 
@@ -309,9 +311,7 @@ hash table and \code{LF} indicates the fraction of filled entries.
 The operations in \htuvm can be invoked both for a single key or for a batch of
 keys; the latter will avoid the overhead of repeated kernel launches. \Htuvm
 assigns each operation to a cooperative group (CG) which is commonly referred to
-as warp-cooperative work scheduling (WCWS), and has been used in prior work~\cite{gfsl-pact-2017,warpcore-hipc-2020}.
-
-We have incorporated managed memory allocation to enable a vanilla UVM support.
+as warp-cooperative work scheduling (WCWS), and has been used in prior work~\cite{gfsl-pact-2017,warpcore-hipc-2020}. In addition, we have incorporated managed memory allocation to enable a vanilla UVM support.
 
 \paragraph*{Skip Lists with UVM Support}
 
@@ -325,18 +325,19 @@ the super-nodes in GFSL.
 
 \paragraph*{Optimizing Data Movement}
 
-However, the vanilla implementation performs very poorly with more than 50\%
-oversubscription. A general good-quality hash function distributes the memory
-accesses across different buckets, which leads to touching random pages
+The vanilla implementation performs very poorly with more than 50\%
+oversubscription, because of the random memory access pattern in these data
+structures. A general good-quality hash function in a hash table distributes the
+memory accesses across different buckets, which leads to touching random pages
 depending on the input key pattern. Oversubscription further leads to many pages
-storing hash table data to get evicted (based on variants of LRU replacement
+storing hash table data to get evicted (based on variants of least-recently-faulted replacement
 policy implemented by the contemporary NVIDIA GPUs). This gives rise to frequent
 far faults. Far faults are expensive because they incur overheads of page
 unmapping on the CPU, page migration to the GPU, and installing page table
 entries in the GPU. Multiple concurrent warps (or CGs) stall waiting for their
 respective far faults to be resolved, thereby hurting
 performance~\cite{irregular-page-walks-isca-2018,neighborhood-aware-addr-translation-micro-2018}.
-For example, in our initial experiments, the \code{insert()} kernel does not
+For example, in our experiments with the baseline UVM hash table, the \code{insert()} kernel does not
 finish within even 24 hours with 100\% oversubscription on a GPU with 16 GB
 memory.
 
@@ -353,8 +354,7 @@ prefetching hints~\cite{cuda-programming-guide}.
 % array containing keys to be operated on as well as the auxiliary array of values
 % used by the \code{insert()} kernel.
 The best combination of hints for the \code{insert()} kernel found through empirical evaluation is
-\code{cudaMemAdviseSetAccessedBy} and \code{cudaMemPrefetchAsync} for the hash table array and the input %and auxiliary
-array (not shown in Algorithm~\ref{alg:ht-uvm-insert}).
+\code{cudaMemAdviseSetAccessedBy} and \code{cudaMemPrefetchAsync} for the hash table array and the input array.
 The first hint indicates that the hash table array, the input array, and the auxiliary array will be predominantly accessed by the GPU, allowing the runtime
 to pre-map the page table entries on the GPU without actually migrating the data. The \code{cudaMemPrefetchAsync} hint
 allows the runtime to asynchronously prefetch the hinted pages before the kernel starts,
@@ -370,29 +370,30 @@ because the hash table pages anyway get evicted due to oversubscription.
 % and then be migrated back on future access.
 The \code{cudaMemAdviseSetReadMostly} hint is not applicable as we update the hash table across kernel launches.
 
-We also experiment with the memory advise and prefetch hints, and find
-that only prefetch hints are useful for the super-nodes of SL-UVM and the input key array. We do
-not use any hints for the auxiliary value array.
+For skip lists, we similarly experiment with the memory advise and prefetch
+hints, and find that only prefetch hints are useful for the super-nodes of
+SL-UVM and the input key array. We do not use any hints for the auxiliary value
+array.
 
 \paragraph*{Shortcomings of the Vanilla UVM Design}
 
-We now point out the bottlenecks faced by these UVM-based data structure designs
-and why existing techniques that aim to optimize UVM performance fail to address
-them. We use our hash table and skip list designs to implement key-value stores
-in two real-world applications, namely, \textit{metagenomics classification} and
-\textit{k-mer counting}~\cite{cuclark,metacache-icpp-2021}. Both applications
-rely heavily on key-value stores to efficiently process large-scale genomics
-datasets.
-The metagenomics classifier divides a genome into fixed substrings of length $k$~(called a \textit{k-mer}) and encodes each nucleotide~(Adenine, Thymine, Guanine, Cytosine) of the substring using two bits to form the key $K$ representing the substring.
-Each key $K$ is associated with a \textit{taxon\_id}, which uniquely identifies an organism and acts as the value of the key.
-The classifier consists of two phases, namely, construction of the key-value pair database involving insert operations and the classification phase
-involving search operations.
-The k-mer counting application tracks the frequency of each k-mer in a genome.
-Instead of the \textit{taxon\_id}, the frequency of a k-mer serves as its value.
-In our evaluation, we use genome sequences from the NCBI dataset~\cite{refseq-ncbi} for building and querying the database.
-We set $16$ as the k-mer length in terms of the number of nucleotides leading to 32-bit keys.
+% We now point out the bottlenecks faced by these UVM-based data structure designs
+% and why existing techniques that aim to optimize UVM performance fail to address
+% them.
 
-We further study the scalability of a real-world application that uses \htuvm and \skipuvm to implement key-value stores.
+% We further study the scalability of a real-world application that uses \htuvm and \skipuvm to implement key-value stores.
+We use our hash table and skip list designs, optimized with NVIDIA-provided data migration hints, to implement key-value stores
+in a real-world application, \emph{metagenomics classification}~\cite{cuclark,metacache-icpp-2021}, and study the scalability. % Both applications
+% rely heavily on key-value stores to efficiently process large-scale genomics
+% datasets.
+% The metagenomics classifier divides a genome into fixed substrings of length $k$~(called a \textit{k-mer}) and encodes each nucleotide~(Adenine, Thymine, Guanine, Cytosine) of the substring using two bits to form the key $K$ representing the substring.
+% Each key $K$ is associated with a \textit{taxon\_id}, which uniquely identifies an organism and acts as the value of the key.
+% The classifier consists of two phases, namely, construction of the key-value pair database involving insert operations and the classification phase
+% involving search operations.
+% The k-mer counting application tracks the frequency of each k-mer in a genome.
+% Instead of the \textit{taxon\_id}, the frequency of a k-mer serves as its value.
+In our evaluation, we use genome sequences from the NCBI dataset~\cite{refseq-ncbi} for building and querying the database.
+
 Figure~\ref{fig:App-uvm-perf-motivation} shows the scaling of a metagenomics classifier~\cite{metacache-icpp-2021} with data placement and prefetching hints enabled.
 %As shown in Figures~\ref{fig:App-SL-motivation} and~\ref{fig:App-HT-motivation},
 Both \htuvm and \skipuvm exhibit \emph{poor} scaling behavior in the two key phases of the metagenomics classifier, namely, \textsf{Build}~(uses the \code{insert()} kernel) and \textsf{Classify}~(uses the \code{search()} kernel). As the degree of memory oversubscription increases from 0\% to higher levels, the run time of both the phases increases non-linearly. % The results shown correspond to executions of \htuvm and \skipuvm with memory hints enabled (Figure~\ref{fig:ht-uvm-perf-motivation-w-hints});
@@ -400,16 +401,16 @@ Without data placement and prefetching hints, the application run time degrades 
 
 \begin{figure}[h!]
   \centering
-    \begin{subfigure}[b]{0.5\columnwidth}
+    \begin{subfigure}[b]{0.48\columnwidth}
       \centering
-      \includegraphics[width=0.99\linewidth]{"./figs/Applications_Motivation_HT.pdf"}
+      \includegraphics[width=0.7\linewidth]{"./figs/Applications_Motivation_HT.pdf"}
       \caption{Scaling with \htuvm}
       \label{fig:App-HT-motivation}
     \end{subfigure}%
     \hfill%
-    \begin{subfigure}[b]{0.5\columnwidth}
+    \begin{subfigure}[b]{0.48\columnwidth}
       \centering
-      \includegraphics[width=0.99\linewidth]{"./figs/Applications_Motivation_SL.pdf"}
+      \includegraphics[width=0.7\linewidth]{"./figs/Applications_Motivation_SL.pdf"}
       \caption{Scaling with \skipuvm}
       \label{fig:App-SL-motivation}
     \end{subfigure}
@@ -450,14 +451,19 @@ In the following, we outline our proposal's key research objectives which aim
 to explore efficient GPU data structure designs for oversubscription.
 
 \begin{itemize}
+    \item Propose a high-performance adaptive AMQ filter design for GPUs,
   \item Extend existing in-memory designs of AMQ and B-tree variants to work with oversubscription (\eg, allocate managed memory with \code{cudaMallocManaged()} and avoid explicit memory copies),
     \item Show limitations in using \nvidia-provided APIs (\eg,  \code{cudaMemAdvise()}) for managing data movement,
     \item Propose more efficient and scalable designs for AMQ and B-tree variants,
-    \item Explore performance bottlenecks of UVM applications in a multi-GPU setup,
-    \item Propose a high-performance adaptive AMQ filter design for GPUs.
+    \item Explore performance bottlenecks of UVM applications in a multi-GPU setup.
 \end{itemize}
 
 We expand each objective in more detail in the following.
+
+\subsection*{Adaptive Filters for GPUs}
+
+Approximate membership query (AMQ) filters are data structures that maintain a space-optimized approximate representation of a set or a multiset~\cite{gpu-filters-ppopp23}.
+AMQ filters are popularly used in databases, networks, and file systems, where there is a substantial benefit by quickly filtering negative queries. AMQs though allow queries to occasionally return a false positive.
 
 \subsection*{Designing Oversubscribed Data Structures}
 
@@ -512,7 +518,6 @@ manipulation~\cite{perks-isc-2023}.
 
 \subsection*{Exploring Performance on a Multi-GPU Setup}
 
-\subsection*{Adaptive Filters for GPUs}
 
 \section*{Ongoing Work}
 
