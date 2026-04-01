@@ -59,7 +59,7 @@
 \newcommand{\heterosl}{\textsf{SL-OVS}\xspace}
 
 \setlength{\droptitle}{-2cm}
-\title{Designing Efficient GPU Data Structures for Oversubscription}
+\title{Exploring Efficient GPU Data Structures for Oversubscription}
 \author{Srinjoy Sarkar \\
     Department of Computer Science Engineering, \\
 Indian Institute of Technology Kanpur, India,  \\
@@ -439,12 +439,29 @@ Thus, it is imperative to come up with targeted novel data structure designs tha
 \section*{Problem Statement and Proposed Work}
 
 We propose to work on designing efficient GPU data structures to handle use
-cases where the application oversubscribes GPU memory. In particular, we will
-focus on the following data structures popularly used in GPU kernels: hash
-table, skip list, and approximate membership query filter. These data
-structures are characterized by random accesses, and hence encounter frequent
-pages faults and unnecessary data migrations between the CPU and the GPU with
-the UVM programming model. We have profiled existing in-memory implementations
+cases where applications oversubscribe GPU memory. In particular, we will focus
+on the following data structures popularly used in GPU kernels: hash table, skip
+list, approximate membership query filter, and B- and B\textsuperscript{+}-tree.
+These data structures are characterized by random accesses, and hence encounter
+frequent pages faults and unnecessary data migrations between the CPU and the
+GPU with the UVM programming model.
+
+In the following, we outline our proposal's key research objectives which aim
+to explore efficient GPU data structure designs for oversubscription.
+
+\begin{itemize}
+  \item Extend existing in-memory designs of AMQ and B-tree variants to work with oversubscription (\eg, allocate managed memory with \code{cudaMallocManaged()} and avoid explicit memory copies),
+    \item Show limitations in using \nvidia-provided APIs (\eg,  \code{cudaMemAdvise()}) for managing data movement,
+    \item Propose more efficient and scalable designs for AMQ and B-tree variants,
+    \item Explore performance bottlenecks of UVM applications in a multi-GPU setup,
+    \item Propose a high-performance adaptive AMQ filter design for GPUs.
+\end{itemize}
+
+We expand each objective in more detail in the following.
+
+\subsection*{Designing Oversubscribed Data Structures}
+
+We have profiled existing in-memory implementations
 of these data structures, and have identified several bottlenecks. Unlike
 traditional designs, we plan to explore alternate hierarchical memory layouts
 for these data structures to maximize access locality and hence improve
@@ -454,32 +471,6 @@ allow operating on the data. Our preliminary results show that our custom data
 structure designs have the potential to substantially improve performance over
 the optimized UVM baselines while supporting high degree of GPU memory
 oversubscription for many inputs.
-
-
-In the following, we outline our proposal's key research objectives which aim
-to explore efficient data structure designs for popular GPU data structures such as hash tables, skip lists, and AMQs with oversubscription.
-
-\begin{itemize}
-    \item Extend existing in-memory designs to work with oversubscription (\eg, allocate managed memory with \code{cudaMallocManaged()} and avoid explicit memory copies),
-    \item Show limitations in using \nvidia-provided APIs like \code{cudaMemAdvise()} and \code{cudaMemPrefetchAsync()} for managing data movement for designing UVM-enabled data structures,
-    \item Propose new designs for three popular GPU data structures: hash table, skip list, and AMQ,
-    \item Validate the efficiency of our new designs by integrating our implementations in real-world applications~\cite{metacache-icpp-2021}.\footnote{\url{https://github.com/funatiq/cuclark}}
-\end{itemize}
-
-We expand each objective in more detail in the following.
-
-An alternate strategy to deal with oversubscription is to partition the huge
-input workload in multiple batches such that each batch fits within the GPU
-memory, and then launch multiple kernels. Batching as an optimization is
-commonly performed across application domains (\eg, deep learning training).
-\emph{WarpDrive}~\cite{warpdrive} proposed a multi-GPU hash table that
-partitions large inputs to fit on a GPU. However, such partitioning is
-programmer-driven, tedious, error-prone, brittle (\ie, will break for even
-larger inputs), and expensive. Furthermore, certain applications may require
-specialized GPU computing algorithms that may preclude manual data
-manipulation~\cite{perks-isc-2023}.
-
-\subsection*{Designing Oversubscribed Data Structures}
 
 Existing techniques, such as prefetching and page replacement policies, optimize
 memory usage, but often fail to be effective when applications with irregular
@@ -508,60 +499,30 @@ proposal, we will explore possible designs of hash tables, skip lists, and AMQ
 filters that scale with input size.
 
 
-\section*{Results so far}
+An alternate strategy to deal with oversubscription is to partition the huge
+input workload in multiple batches such that each batch fits within the GPU
+memory, and then launch multiple kernels. Batching as an optimization is
+commonly performed across application domains (\eg, deep learning training).
+\emph{WarpDrive}~\cite{warpdrive} proposed a multi-GPU hash table that
+partitions large inputs to fit on a GPU. However, such partitioning is
+programmer-driven, tedious, error-prone, brittle (\ie, will break for even
+larger inputs), and expensive. Furthermore, certain applications may require
+specialized GPU computing algorithms that may preclude manual data
+manipulation~\cite{perks-isc-2023}.
 
-We have designed a two level hierarchical structure for both hash table and skiplist.
-\begin{figure}[t]
-    \centering
-    \begin{subfigure}[b]{0.28\columnwidth}
-        \centering
-        \includegraphics[width=\linewidth]{"./figs/comparison_speedup_insert_cuco.pdf"}
-        \caption{{Speedup of \htovs relative to cuco static map for the \code{insert()}.}}
-        \label{fig:ht-uvm-cuco-comparison-insert}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.28\columnwidth}
-        \centering
-        \includegraphics[width=\linewidth]{"./figs/comparison_speedup_search_cuco.pdf"}
-        \caption{{Speedup of \htovs relative to cuco static map for the \code{search()}.}}
-        \label{fig:ht-uvm-cuco-comparison-search}
-    \end{subfigure}
-    \begin{subfigure}[b]{0.28\columnwidth}
-        \centering
-        \includegraphics[width=\linewidth]{"./figs/comparison_speedup_insert_gph.pdf"}
-        \caption{{Speedup of \htovs relative to GPH for the \code{insert()}.}}
-        \label{fig:ht-uvm-GPH-comparison}
-    \end{subfigure}
-    \caption{Scaling of \htuvm and \skipuvm with oversubscription}
-    \label{fig:results hashtable}
-\end{figure}
-The hash table structure achieves a speedup of 41x for 100\% oversubscription scenario for \code{insert()} kernel and upto 10.4x for \code{search()} kernel(as shown in figure~\ref{fig:ht-uvm-cuco-comparison-insert} and~\ref{fig:ht-uvm-cuco-comparison-search}), over NVIDIA proposed cuCollections~\cite{cucollections-nvidia} when extended to support oversubscription. Our hash table also achieves a speed up of upto 40.8x over GPH~\cite{gph-pamd-2025} for \code{insert()} kernel as shown in figure~\ref{fig:ht-uvm-GPH-comparison}.
+\subsection*{Exploring Performance on a Multi-GPU Setup}
 
-Our \skipovs also outperforms the UVM version GFSl~\cite{gfsl-pact-2017} upto 1.59x for \code{insert()} and 1.64x for \code{search()} with sorting enabled for both.
-
-We also incoroporated our designs of \htovs and \skipovs in \textbf{metagenomics classifier}\cite{metacache-icpp-2021} and \textbf{k-mer counting}\cite{cuclark}.
-
-\begin{figure}[t]
-    \centering
-    \includegraphics[scale=0.27]{"./figs/comparison_applications.pdf"}
-    \caption{Speedup achieved by \htovs and \skipovs over \htuvm and \skipuvm respectively.}
-    \label{fig:application}
-    \vspace*{-2mm}
-\end{figure}
-As shown in figure~\ref{fig:application}, for hash table, \htovs enjoys a speedup of up to $2.1\times$ for metagenomics database build, $4.8\times$ for k-mer counting and $6\times$ for metagenomics classification phase.
-Even for 50\% GPU memory oversubscription, \htovs offers speedup in the range of $1.4\times$ to $6\times$ over \htuvm.
-\Skipovs achieves a geomean speedup of $2.4\times$ over \skipuvm for the build phase of the metagenomics classifier and the achieved speedup increases with growing oversubscription degree. The geomean speedup achieved by \skipovs for the metagenomics classification phase is $1.81\times$ over \skipuvm. The k-mer counting application enjoys a geomean speedup of $6.3\times$ with \Skipovs over \Skipuvm.
+\subsection*{Adaptive Filters for GPUs}
 
 \section*{Ongoing Work}
 
-
-\paragraph*{Current Status}
 Our work \textit{Designing GPU Data Structures for Efficient Memory Oversubscription} has been accepted to appear on OOPSLA 2026.
 
 \clearpage
 
 {\scriptsize
     \bibliographystyle{plain}
-    \bibliography{./../references/venue-full.bib,./../references/references.bib,./../references/venue-abbrv.bib}
+    \bibliography{./../references/venue-full.bib,./../references/references.bib}
 }
 
 \end{document}
