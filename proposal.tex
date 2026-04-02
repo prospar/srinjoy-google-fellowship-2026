@@ -465,28 +465,27 @@ overhead~\cite{gpu-filters-ppopp23,aqf-sigmod}. AMQ filters significantly reduce
 memory overhead costs compared to exact lookup mechanisms, making them
 well-suited for large-scale applications. AMQ filters are popularly used in
 databases, networks, and file systems, where there is a substantial benefit by
-quickly filtering negative queries. AMQs though allow queries to occasionally
+quickly filtering negative queries. AMQs allow queries to occasionally
 return a false positive.
 
-A key limitation of static AMQ structures is their vulnerability to adversarial query patterns. An adversary can repeatedly query elements that consistently yield false positives, degrading the reliability of the system. Unlike filters with a predetermined false positive rate, adaptive filters dynamically adjust to evolving workloads and data distributions, thereby improving their accuracy over time.
-Adaptive filters modify their internal state in response to negative queries, effectively reducing repeated false positives. Furthermore, adaptive filters demonstrate robust performance under skewed query distributions, which are common in real-world workloads. These properties make them an increasingly important data structure in contemporary large-scale systems. An implicit assumption is that oracle knowledge is available to decide which queries return false positives so that corrective action can be taken.
+A key limitation of static AMQ structures is their vulnerability to adversarial query patterns. An adversary can repeatedly query elements that consistently yield false positives, degrading the reliability of the system. Unlike filters with a predetermined false positive rate, adaptive filters dynamically adjust to evolving workloads and data distributions by modifying their internal state in response to negative queries, thereby effectively reducing repeated false positives and improving their accuracy over time.
+An implicit assumption is that oracle knowledge is available to decide which queries return false positives so that corrective action can be taken.
+Adaptive filters demonstrate robust performance under skewed query distributions, which are common in real-world workloads. These properties make them an increasingly important data structure in contemporary large-scale systems.
 
-Among the existing designs, the adaptive quotient filter (AQF)~\cite{aqf-sigmod}, built upon the RSQF quotient filter~\cite{rsqf}, represents the current state-of-the-art to eliminate recurring false positives. On a query, the AQF performs a secondary check with an exact map (possibly stored on disk) to identify a false positive, and then extends the fingerprint remainder by extra bits to reduce the chances of hash collision. 
-
-However, to the best of our knowledge, there has been no prior work on designing adaptive filters specifically optimized for GPU architectures. Although a quotient filter enjoys better locality than a Bloom filter, the adaptive and counting mechanisms in AQF are difficult to parallelize efficiently. A \naive GPU port will likely perform poorly compared to a CPU implementation because of branch and memory divergence. In this proposal, we aim to develop a GPU-based adaptive filter that leverages the parallel processing capabilities of modern GPUs to significantly improve query throughput and reduce latency. Such a design has the potential to substantially accelerate approximate membership queries in high-performance and large-scale environments, thereby broadening the applicability of adaptive filters in data-intensive systems.
+Among the existing designs, the adaptive quotient filter (AQF)~\cite{aqf-sigmod}, built upon the RSQF quotient filter~\cite{rsqf}, represents the current state-of-the-art to eliminate recurring false positives. On a query, the AQF performs a secondary check with an exact map (possibly stored on disk) to identify a false positive, and then extends the fingerprint remainder by extra bits to reduce the chances of hash collision. However, to the best of our knowledge, there has been no prior work on designing adaptive filters specifically optimized for GPU architectures. Although a quotient filter enjoys better locality than a Bloom filter, the adaptive and counting mechanisms in AQF are difficult to parallelize efficiently. A \naive GPU port will likely perform poorly compared to a CPU implementation because of branch and memory divergence. In this proposal, we aim to develop a GPU-based adaptive filter that leverages the parallel processing capabilities of modern GPUs to significantly improve query throughput and reduce latency. Such a design has the potential to substantially accelerate approximate membership queries in high-performance and large-scale environments, thereby broadening the applicability of adaptive filters in data-intensive systems.
 
 \subsection*{Designing Oversubscribed Data Structures}
 
-We have worked on designing alternate hierarchical memory layouts for hash table
+We have experience in designing alternate hierarchical memory layouts for hash table
 and skip list data structures to maximize access locality and hence improve
-performance. The insight is that the outer-level containers enable efficient
+performance~\cite{gpu-ovs-ds-oopsla-2026}. The insight is that the outer-level containers enable efficient
 jumps to desired regions of the data structure, while the inner containers allow
 operating on the data. Our preliminary results show that our custom data
 structure designs have the potential to substantially improve performance over
 the optimized UVM baselines while supporting high degree of GPU memory
 oversubscription for many inputs. Our work has been published in OOPSLA 2026~\cite{gpu-ovs-ds-oopsla-2026}.
 
-We want to continue our work on GPU data strutures by exploring better designs for B-tree and its variants and AMQ filters with UVM support, such that they scale with input size.
+We want to continue our work on GPU data strutures by exploring better designs for other important data structures such as B-tree and its variants and AMQ filters with UVM support, such that they scale with input size.
 Scaling concurrent GPU data structures to high degrees of GPU memory
 oversubscription requires novel designs that take into consideration the
 potential lack of locality in the access pattern. The key insights for
@@ -536,7 +535,7 @@ Overall, studying UVM data structures alongside these emerging approaches is ess
 
 \section*{Ongoing Work}
 
-Our work \textit{Designing GPU Data Structures for Efficient Memory Oversubscription} has been accepted to appear in OOPSLA 2026~\cite{gpu-ovs-ds-oopsla-2026}. We are currently studying the design of different AMQ proposals with a view to extending to GPUs. Parallely, we are also extending our hash table and skip list work that targeted nodes with a single GPU to a multi-GPU setup.
+Our work \textit{Designing GPU Data Structures for Efficient Memory Oversubscription} has recently been accepted to appear in OOPSLA 2026~\cite{gpu-ovs-ds-oopsla-2026}. We are currently studying the design of different AMQ proposals with a view to extending to GPUs~\cite{aqf-sigmod,gpu-filters-ppopp23,quotient-filter}. Parallely, we are also extending our hash table and skip list work that targeted nodes with a single GPU to a multi-GPU setup~\cite{warpdrive}.
 
 \clearpage
 
