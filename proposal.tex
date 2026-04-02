@@ -75,7 +75,7 @@ Indian Institute of Technology Kanpur, India,  \\
 
 The high compute capability and memory bandwidth of GPUs, coupled with energy
 efficiency, have spurred their usage across a diverse set of application domains
-including scientific computing simulations, big data and large-scale graph
+including scientific computing simulations, large-scale graph
 analytics, and computational biology~\cite{nvidia-applications, tensorflow-2015, metacache-icpp-2021}.
 Furthermore, improved compute capabilities have led to a steady rise in the
 working set sizes of GPU-accelerated applications, which now often far exceed
@@ -105,16 +105,16 @@ Data structures like hash tables, skip lists, B-trees, and approximate membershi
 Lack of locality in the input operation strings and suboptimal implementation
 choices can lead to irregular access patterns and poor data locality. When
 memory oversubscription is coupled with these performance pathologies, these
-data structures can exhibit very poor scalability. In this proposal, we
-establish that UVM-based implementations of popular random-access data
-structures with GPU memory oversubscription do not scale well with input size
-even when these implementations are meticulously optimized using data usage
-hints and prefetches based on memory/translation
-usage~\cite{nvidia-prefetching}. Our experiments show that the run times of
-these implementations increase exponentially with a linear increase in the input
-sizes indicating a clear \emph{performance bottleneck}. We focus on alleviating
-this performance pathology by proposing efficient designs of popular concurrent data
-structures for GPUs (\eg, hash table, skip list, AMQ filter, and B-trees).
+data structures can exhibit very poor scalability. UVM-based
+implementations of popular random-access data structures with GPU memory
+oversubscription do not scale well with input size even when these
+implementations are meticulously optimized using data usage hints and prefetches
+based on memory/translation usage~\cite{nvidia-prefetching}. Our experiments
+show that the run times of these implementations increase exponentially with a
+linear increase in the input sizes indicating a clear \emph{performance
+  bottleneck}. In this proposal, we focus on alleviating this performance
+pathology by proposing efficient designs of popular concurrent data structures
+for GPUs (\eg, hash table, skip list, AMQ filter, and B-trees).
 
 \section*{Brief Literature Review}
 
@@ -269,7 +269,7 @@ size of a warp (\ie, $N + 2$ is 32).
 
 \begin{figure}[b]
     \centering
-    \includegraphics[width=0.7\columnwidth]{"./figs/gfsl-design-overview-sb.drawio.pdf"}
+    \includegraphics[width=0.6\columnwidth]{"./figs/gfsl-design-overview-sb.drawio.pdf"}
     \caption{GFSL with two keys per super-node
         % and search of key 11
     }
@@ -393,7 +393,6 @@ in a real-world application, \emph{metagenomics classification}~\cite{cuclark,me
 % The k-mer counting application tracks the frequency of each k-mer in a genome.
 % Instead of the \textit{taxon\_id}, the frequency of a k-mer serves as its value.
 In our evaluation, we use genome sequences from the NCBI dataset~\cite{refseq-ncbi} for building and querying the database.
-
 Figure~\ref{fig:App-uvm-perf-motivation} shows the scaling of a metagenomics classifier~\cite{metacache-icpp-2021} with data placement and prefetching hints enabled.
 %As shown in Figures~\ref{fig:App-SL-motivation} and~\ref{fig:App-HT-motivation},
 Both \htuvm and \skipuvm exhibit \emph{poor} scaling behavior in the two key phases of the metagenomics classifier, namely, \textsf{Build}~(uses the \code{insert()} kernel) and \textsf{Classify}~(uses the \code{search()} kernel). As the degree of memory oversubscription increases from 0\% to higher levels, the run time of both the phases increases non-linearly. % The results shown correspond to executions of \htuvm and \skipuvm with memory hints enabled (Figure~\ref{fig:ht-uvm-perf-motivation-w-hints});
@@ -440,9 +439,7 @@ Thus, it is imperative to come up with targeted novel data structure designs tha
 \section*{Problem Statement and Proposed Work}
 
 We propose to work on designing efficient GPU data structures to handle use
-cases where applications oversubscribe GPU memory. In particular, we will focus
-on the following data structures popularly used in GPU kernels: hash table, skip
-list, approximate membership query filter, and B- and B\textsuperscript{+}-tree.
+cases where applications oversubscribe GPU memory. 
 These data structures are characterized by random accesses, and hence encounter
 frequent pages faults and unnecessary data migrations between the CPU and the
 GPU with the UVM programming model.
@@ -451,11 +448,10 @@ In the following, we outline our proposal's key research objectives which aim
 to explore efficient GPU data structure designs for oversubscription.
 
 \begin{itemize}
-    \item Propose a high-performance adaptive AMQ filter design for GPUs,
-  \item Extend existing in-memory designs of AMQ and B-tree variants to work with oversubscription (\eg, allocate managed memory with \code{cudaMallocManaged()} and avoid explicit memory copies),
-    \item Show limitations in using \nvidia-provided APIs (\eg,  \code{cudaMemAdvise()}) for managing data movement,
+    \item Propose a high-performance adaptive AMQ filter~\cite{aqf-sigmod} design for GPUs,
+  \item Extend existing in-memory designs of AMQ and B-tree variants~\cite{gpu-btree,harmonia-gpu,multiversion-gpu-btree} to work with oversubscription and show limitations in using \nvidia-provided APIs for managing data movement,
     \item Propose more efficient and scalable designs for AMQ and B-tree variants,
-    \item Explore performance bottlenecks of UVM applications in a multi-GPU setup.
+    \item Explore performance bottlenecks of these popular data structures in a multi-GPU setup.
 \end{itemize}
 
 We expand each objective in more detail in the following.
