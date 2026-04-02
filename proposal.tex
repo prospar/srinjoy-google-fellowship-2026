@@ -481,16 +481,28 @@ However, to the best of our knowledge, there has been no prior work on designing
 
 \subsection*{Designing Oversubscribed Data Structures}
 
-We have profiled existing in-memory implementations
-of these data structures, and have identified several bottlenecks. Unlike
-traditional designs, we plan to explore alternate hierarchical memory layouts
-for these data structures to maximize access locality and hence improve
+We have worked on designing alternate hierarchical memory layouts for hash table
+and skip list data structures to maximize access locality and hence improve
 performance. The insight is that the outer-level containers enable efficient
-jumps to desired regions of the data structure, while the inner containers
-allow operating on the data. Our preliminary results show that our custom data
+jumps to desired regions of the data structure, while the inner containers allow
+operating on the data. Our preliminary results show that our custom data
 structure designs have the potential to substantially improve performance over
 the optimized UVM baselines while supporting high degree of GPU memory
-oversubscription for many inputs.
+oversubscription for many inputs. Our work has been published in OOPSLA 2026~\cite{gpu-ovs-ds-oopsla-2026}.
+
+We want to continue our work on GPU data strutures by exploring better designs for B-tree and its variants and AMQ filters with UVM support, such that they scale with input size.
+Scaling concurrent GPU data structures to high degrees of GPU memory
+oversubscription requires novel designs that take into consideration the
+potential lack of locality in the access pattern. The key insights for
+minimizing page faults are to (i) group nearby keys in the input sequence to
+enhance the locality of the input, and (ii) translate the locality, if any,
+present in the input sequence to the hash table architecture. The first
+requirement ensures that keys within the same page are processed together (i.e.,
+near in time) leveraging spatial locality. The second requirement implies that
+the nearby keys map to nearby memory pages of the data structure. Taken together, the aforementioned two
+requirements optimize memory access pattern and facilitate efficient
+prefetching, which, in turn, reduces the frequency of on-demand page faults and
+subsequent stalls during operations improving overall performance.
 
 Existing techniques, such as prefetching and page replacement policies, optimize
 memory usage, but often fail to be effective when applications with irregular
@@ -500,24 +512,6 @@ Applications with irregular access patterns, e.g., graph-based applications and
 concurrent GPU data structures that require pointer chasing, have poor locality,
 making prefetching counterproductive. Thus, it is imperative to come up with
 targeted novel data structure designs that can scale with the input size.
-
-Scaling concurrent GPU data structures to high degrees of GPU memory
-oversubscription requires novel designs that take into consideration the
-potential lack of locality in the access pattern. The key insights for
-minimizing page faults are to (i) group nearby keys in the input sequence to
-enhance the locality of the input, and (ii) translate the locality, if any,
-present in the input sequence to the hash table architecture. The first
-requirement ensures that keys within the same page are processed together (i.e.,
-near in time) leveraging spatial locality. The second requirement implies that
-the nearby keys map to nearby memory pages of the hash table. This is, in
-general, challenging because a general hash function may end up mapping even
-consecutive keys to far apart pages. Taken together, the aforementioned two
-requirements optimize memory access pattern and facilitate efficient
-prefetching, which, in turn, reduces the frequency of on-demand page faults and
-subsequent stalls during operations improving overall performance In this
-proposal, we will explore possible designs of hash tables, skip lists, and AMQ
-filters that scale with input size.
-
 
 An alternate strategy to deal with oversubscription is to partition the huge
 input workload in multiple batches such that each batch fits within the GPU
@@ -532,20 +526,21 @@ manipulation~\cite{perks-isc-2023}.
 
 \subsection*{Exploring Performance on a Multi-GPU Setup}
 
-The use of GPUs is ubiquitous today for executing massively parallel AI and ML applications that rely on mathematical operations such as SpMV, SpMM, and convolution kernels. 
-The introduction of UVM by Nvidia~\cite{fine-grain-quantitative-uvm-taco24} simplifies memory management by providing a unified address space accessible across devices. 
-Unified addressing also reduces the complexity of explicit memory transfers and enables developers to design scalable applications.
+% The use of GPUs is ubiquitous today for executing massively parallel AI and ML applications that rely on mathematical operations such as SpMV, SpMM, and convolution kernels. 
+% The introduction of UVM by Nvidia~\cite{fine-grain-quantitative-uvm-taco24} simplifies memory management by providing a unified address space accessible across devices. 
+% Unified addressing also reduces the complexity of explicit memory transfers and enables developers to design scalable applications.
+
 Modern compute nodes, especially in HPC clusters and cloud environments, often include multiple GPUs per node, making efficient data sharing critical for the seamless operation of applications across devices.
-The performance of these applications scales well when the access pattern is regular, but suffers severe degradation under irregular access patterns~\cite {uvm-ds-oopsla-2026,glift-tog-2006}.
-While multi-GPU systems can offer better speedup by exploiting the increased aggregate memory capacity of the multiple devices for larger data sets and improved concurrency, the performance is often limited by the communication overhead associated with the data sharing~\cite{gpusm-gpgpuw-2015,multi-gpu-spmv-taco-2024,cache-aware-spmv-2025,multigpu-comm-js-2018}.
+The performance of these applications scales well when the access pattern is regular, but suffers severe degradation under irregular access patterns~\cite {gpu-ovs-ds-oopsla-2026,glift-tog-2006}.
+While multi-GPU systems can offer better speedup by exploiting the increased aggregate memory capacity of the multiple devices for larger data sets and improved concurrency, the performance is often limited by the communication overhead associated with the data sharing~\cite{gpusm-gpgpuw-2015,multi-gpu-spmv-taco-2024,multigpu-comm-js-2018}.
 Recent research highlights both the opportunities and challenges in this area. For example, studies show that UVM-based implementations can outperform manual memory management by up to 1.8× in some multi-GPU workloads, while significantly improving programmability~\cite{multi-gpu-nas-2021}.
-At the same time, newer work on multi-GPU data structures—such as sparse matrix frameworks—focuses on fine-grained data partitioning and load balancing to efficiently distribute irregular workloads across GPUs~\cite{multi-gpu-spmv-taco-2024,cache-aware-spmv-2025}.
+At the same time, newer work on multi-GPU data structures—such as sparse matrix frameworks—focuses on fine-grained data partitioning and load balancing to efficiently distribute irregular workloads across GPUs~\cite{multi-gpu-spmv-taco-2024}.
 Other research explores alternative models, such as shared-memory multi-GPU architectures, partitioned global address spaces, and object affinity in the application to GPUs~\cite{oasis-hpca-2025}, to reduce communication overhead and improve scalability.
 Overall, studying UVM data structures alongside these emerging approaches is essential for building high-performance, scalable applications in domains such as machine learning, scientific computing, and large-scale graph processing.
 
 \section*{Ongoing Work}
 
-Our work \textit{Designing GPU Data Structures for Efficient Memory Oversubscription} has been accepted to appear on OOPSLA 2026.
+Our work \textit{Designing GPU Data Structures for Efficient Memory Oversubscription} has been accepted to appear in OOPSLA 2026~\cite{gpu-ovs-ds-oopsla-2026}. We are currently studying the design of different AMQ proposals with a view to extending to GPUs. Parallely, we are also extending our hash table and skip list work that targeted nodes with a single GPU to a multi-GPU setup.
 
 \clearpage
 
