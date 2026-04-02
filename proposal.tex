@@ -462,8 +462,22 @@ We expand each objective in more detail in the following.
 
 \subsection*{Adaptive Filters for GPUs}
 
-Approximate membership query (AMQ) filters are data structures that maintain a space-optimized approximate representation of a set or a multiset~\cite{gpu-filters-ppopp23}.
-AMQ filters are popularly used in databases, networks, and file systems, where there is a substantial benefit by quickly filtering negative queries. AMQs though allow queries to occasionally return a false positive.
+Approximate membership query (AMQ) filters are data structures that maintain a
+space-optimized approximate representation of a set or a multiset and allow
+efficient probabilistic set membership tests with minimal memory
+overhead~\cite{gpu-filters-ppopp23,aqf-sigmod}. AMQ filters significantly reduce
+memory overhead costs compared to exact lookup mechanisms, making them
+well-suited for large-scale applications. AMQ filters are popularly used in
+databases, networks, and file systems, where there is a substantial benefit by
+quickly filtering negative queries. AMQs though allow queries to occasionally
+return a false positive.
+
+A key limitation of static AMQ structures is their vulnerability to adversarial query patterns. An adversary can repeatedly query elements that consistently yield false positives, degrading the reliability of the system. Unlike filters with a predetermined false positive rate, adaptive filters dynamically adjust to evolving workloads and data distributions, thereby improving their accuracy over time.
+Adaptive filters modify their internal state in response to negative queries, effectively reducing repeated false positives. Furthermore, adaptive filters demonstrate robust performance under skewed query distributions, which are common in real-world workloads. These properties make them an increasingly important data structure in contemporary large-scale systems. An implicit assumption is that oracle knowledge is available to decide which queries return false positives so that corrective action can be taken.
+
+Among the existing designs, the adaptive quotient filter (AQF)~\cite{aqf-sigmod}, built upon the RSQF quotient filter~\cite{rsqf}, represents the current state-of-the-art to eliminate recurring false positives. On a query, the AQF performs a secondary check with an exact map (possibly stored on disk) to identify a false positive, and then extends the fingerprint remainder by extra bits to reduce the chances of hash collision. 
+
+However, to the best of our knowledge, there has been no prior work on designing adaptive filters specifically optimized for GPU architectures. Although a quotient filter enjoys better locality than a Bloom filter, the adaptive and counting mechanisms in AQF are difficult to parallelize efficiently. A \naive GPU port will likely perform poorly compared to a CPU implementation because of branch and memory divergence. In this proposal, we aim to develop a GPU-based adaptive filter that leverages the parallel processing capabilities of modern GPUs to significantly improve query throughput and reduce latency. Such a design has the potential to substantially accelerate approximate membership queries in high-performance and large-scale environments, thereby broadening the applicability of adaptive filters in data-intensive systems.
 
 \subsection*{Designing Oversubscribed Data Structures}
 
@@ -518,6 +532,16 @@ manipulation~\cite{perks-isc-2023}.
 
 \subsection*{Exploring Performance on a Multi-GPU Setup}
 
+The use of GPUs is ubiquitous today for executing massively parallel AI and ML applications that rely on mathematical operations such as SpMV, SpMM, and convolution kernels. 
+The introduction of UVM by Nvidia~\cite{fine-grain-quantitative-uvm-taco24} simplifies memory management by providing a unified address space accessible across devices. 
+Unified addressing also reduces the complexity of explicit memory transfers and enables developers to design scalable applications.
+Modern compute nodes, especially in HPC clusters and cloud environments, often include multiple GPUs per node, making efficient data sharing critical for the seamless operation of applications across devices.
+The performance of these applications scales well when the access pattern is regular, but suffers severe degradation under irregular access patterns~\cite {uvm-ds-oopsla-2026,glift-tog-2006}.
+While multi-GPU systems can offer better speedup by exploiting the increased aggregate memory capacity of the multiple devices for larger data sets and improved concurrency, the performance is often limited by the communication overhead associated with the data sharing~\cite{gpusm-gpgpuw-2015,multi-gpu-spmv-taco-2024,cache-aware-spmv-2025,multigpu-comm-js-2018}.
+Recent research highlights both the opportunities and challenges in this area. For example, studies show that UVM-based implementations can outperform manual memory management by up to 1.8× in some multi-GPU workloads, while significantly improving programmability~\cite{multi-gpu-nas-2021}.
+At the same time, newer work on multi-GPU data structures—such as sparse matrix frameworks—focuses on fine-grained data partitioning and load balancing to efficiently distribute irregular workloads across GPUs~\cite{multi-gpu-spmv-taco-2024,cache-aware-spmv-2025}.
+Other research explores alternative models, such as shared-memory multi-GPU architectures, partitioned global address spaces, and object affinity in the application to GPUs~\cite{oasis-hpca-2025}, to reduce communication overhead and improve scalability.
+Overall, studying UVM data structures alongside these emerging approaches is essential for building high-performance, scalable applications in domains such as machine learning, scientific computing, and large-scale graph processing.
 
 \section*{Ongoing Work}
 
